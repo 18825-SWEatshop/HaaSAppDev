@@ -2,8 +2,10 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import jwt
 from .user_manager import UserManager
+import database
 
 secret_key = "this-is-a-super-secret-key-nobody-will-guess-this-key-duck"
+
 app = FastAPI()
 
 # Model for login requests
