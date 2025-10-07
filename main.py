@@ -15,11 +15,7 @@ class LoginRequest(BaseModel):
 
 @app.post("/login")
 def login(request: LoginRequest):
-    # Hardcoded credential check for now
-    # TODO: Replace with real authentication 
-    
-    if request.username == "admin" and request.password == "admin":
-        # Generate JWT token 
+    if UserManager.login(request.username, request.password):
         token = jwt.encode({"username": request.username}, secret_key, algorithm="HS256")
         return {"message": "Login successful", "token": token}
     else:
@@ -28,7 +24,7 @@ def login(request: LoginRequest):
 @app.post("/register")
 def register(request: LoginRequest):
     # Check to see if user already exists
-    if UserManager.user_exists(request.username, request.password):
+    if UserManager.user_exists(request.username):
         raise HTTPException(status_code=401, detail="User already exists")
     
     # Add user to user manager
