@@ -1,37 +1,42 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import jwt
+import os, jwt
+from dotenv import load_dotenv
 from .user_manager import UserManager
-import database
 
-secret_key = "this-is-a-super-secret-key-nobody-will-guess-this-key-duck"
+load_dotenv()
+SECRET = os.getenv("JWT_SECRET", "dev-secret")
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# Model for login requests
-class LoginRequest(BaseModel):
+class Creds(BaseModel):
     username: str
     password: str
 
-
+@app.post("/register")
+def register(c: Creds):
+    if UserManager.user_exists(c.username):
+        raise HTTPException(401, "User already exists")
+    UserManager.add_user(c.username, c.password)
+    token = jwt.encode({"u": c.username}, SECRET, algorithm="HS256")
+    return {"token": token}
 
 @app.post("/login")
-def login(request: LoginRequest):
-    if UserManager.login(request.username, request.password):
-        token = jwt.encode({"username": request.username}, secret_key, algorithm="HS256")
-        return {"message": "Login successful", "token": token}
-    else:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-@app.post("/register")
-def register(request: LoginRequest):
-    # Check to see if user already exists
-    if UserManager.user_exists(request.username):
-        raise HTTPException(status_code=401, detail="User already exists")
-    
-    # Add user to user manager
-    user = UserManager.add_user(request.username, request.password)
-
-    # Create jwt for user and return it
-    token = jwt.encode({"username": user["username"]}, secret_key, algorithm="HS256")
-    return {"message": "User registered successfully", "token": token}
+def login(c: Creds):
+    if not UserManager.login(c.username, c.password):
+        raise HTTPException(401, "Invalid credentials")
+    token = jwt.encode({"u": c.username}, SECRET, algorithm="HS256")
+    return {"token": token}

@@ -1,25 +1,24 @@
-# Static set of users for now, will later be replaced with DB
+from typing import Optional
+from passlib.hash import pbkdf2_sha256
+from .database import db
+from pymongo.errors import DuplicateKeyError
 
-users = {
-    "alice": "password123",
-    "bob": "securepassword",
-    "charlie": "mypassword",
-    }
+def _users_col():
+    col = db["users"]
+    col.create_index("username", unique=True)
+    return col
 
 class UserManager:
     @staticmethod
     def user_exists(username: str) -> bool:
-        # Check to see if the user exists in the existing users
-        return username in users
+        return _users_col().find_one({"username": username}) is not None
 
     @staticmethod
-    def add_user(username: str, password: str) -> dict:
-        users[username] = password
-        print(f"Current users: {users}")
-        return {"username": username, "password": password}
-    
+    def add_user(username: str, password: str):
+        hashed = pbkdf2_sha256.hash(password)
+        _users_col().insert_one({"username": username, "password_hash": hashed})
+
     @staticmethod
     def login(username: str, password: str) -> bool:
-        if username in users and users[username] == password:
-            return True
-        return False
+        doc: Optional[dict] = _users_col().find_one({"username": username})
+        return bool(doc and pbkdf2_sha256.verify(password, doc["password_hash"]))
