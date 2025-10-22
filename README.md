@@ -15,6 +15,8 @@ You can install uv using pip:
   - ```git clone git@github.com:18825-SWEatshop/HaaSAppDev.git```
 - UV setup 
   - ```uv sync```
+- .env setup 
+  - ```add the .env file shared in the team chat```
 - Start FastAPI Dev server
   - ```uv run fastapi dev```
   - By default, the server will be available at ```127.0.0.1:8000```
