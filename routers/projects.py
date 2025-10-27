@@ -39,15 +39,15 @@ def api_create_project(p: ProjectCreate, user: str = Depends(current_user)):
     final_authorized = sorted(auth_set)
 
     doc = create_project(
-        projectId=p.projectId,
+        projectID=p.projectID,
         name=p.name,
         description=p.description,
         authorized_users=final_authorized,
         owner=user,
     )
-    return {"ok": True, "projectId": doc["projectId"]}
+    return {"ok": True, "projectID": doc["projectID"]}
 
-@router.post("/projects/login")
+@router.post("/login")
 def api_login_project(req: ProjectLogin, user: str = Depends(current_user)):
     if not get_project(req.projectID):
         raise HTTPException(404, "Project not found")
