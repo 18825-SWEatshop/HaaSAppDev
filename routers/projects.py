@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from typing import List
 import jwt, os
-from ..project_manager import create_project, user_can_access, get_project, _projects, add_user_to_project
+from ..project_manager import create_project, user_can_access, get_project, _projects
 
 SECRET = os.getenv("JWT_SECRET", "dev-secret")
 
@@ -31,6 +31,9 @@ class ProjectJoin(BaseModel):
 class AddUserToProject(BaseModel):
     projectID: str
     username: str
+
+class CheckUserAccess(BaseModel):
+    projectID: str
 
 @router.post("/create")
 def api_create_project(p: ProjectCreate, user: str = Depends(current_user)):
@@ -76,3 +79,19 @@ def api_get_user_projects(user: str = Depends(current_user)):
             {"authorizedUsers": user}
         ]
     }, {"_id": 0}))  # Exclude the _id field
+
+@router.post("/confirm-access")
+def api_confirm_user_access(req: CheckUserAccess, user: str = Depends(current_user)):
+    project = get_project(req.projectID)
+    if not project:
+        raise HTTPException(404, "Project not found")
+    
+    has_access = user_can_access(user, req.projectID)
+
+    return {
+        "ok": True,
+        "projectID": req.projectID,
+        "hasAccess": has_access,
+        "isOwner": project["owner"] == user,
+        "isAuthorizedUser": user in project.get("authorizedUsers", [])
+    }
