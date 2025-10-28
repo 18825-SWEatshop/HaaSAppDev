@@ -35,6 +35,9 @@ class AddUserToProject(BaseModel):
 class CheckUserAccess(BaseModel):
     projectID: str
 
+class GetProjectDetails(BaseModel):
+    projectID: str
+
 @router.post("/create")
 def api_create_project(p: ProjectCreate, user: str = Depends(current_user)):
     if get_project(p.projectID):
@@ -94,4 +97,27 @@ def api_confirm_user_access(req: CheckUserAccess, user: str = Depends(current_us
         "hasAccess": has_access,
         "isOwner": project["owner"] == user,
         "isAuthorizedUser": user in project.get("authorizedUsers", [])
+    }
+
+@router.post("/details")
+def api_get_project_details(req: GetProjectDetails, user: str = Depends(current_user)):
+    project = get_project(req.projectID)
+    if not project:
+        raise HTTPException(404, "Project not found")
+    
+    # Check if user has access to view this project
+    if not user_can_access(user, req.projectID):
+        raise HTTPException(403, "You are not authorized to view this project")
+    
+    # For now, hardware allocations and joinedUsers are not implemented yet
+    return {
+        "ok": True,
+        "projectID": project["projectId"],
+        "name": project["name"],
+        "description": project.get("description", ""),
+        "owner": project["owner"],
+        "authorizedUsers": project.get("authorizedUsers", []),
+        "createdAt": project.get("createdAt"),
+        "joinedUsers": project.get("joinedUsers", []),  # Placeholder for future implementation
+        "hardwareAllocations": project.get("hardwareAllocations", [])  # Placeholder for future implementation
     }
