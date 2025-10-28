@@ -76,18 +76,3 @@ def api_get_user_projects(user: str = Depends(current_user)):
             {"authorizedUsers": user}
         ]
     }, {"_id": 0}))  # Exclude the _id field
-
-@router.post("/add-user")
-def api_add_user_to_project(req: AddUserToProject, requester: str = Depends(current_user)):
-    if not get_project(req.projectID):
-        raise HTTPException(404, "Project not found")
-    
-    if not add_user_to_project(req.projectID, req.username, requester):
-        # Check specific reasons for failure
-        project = get_project(req.projectID)
-        if project["owner"] != requester:
-            raise HTTPException(403, "Only project owner can add users")
-        if req.username in project.get("authorizedUsers", []) or req.username == project["owner"]:
-            raise HTTPException(400, "User is already authorized for this project")
-    
-    return {"ok": True, "message": f"User {req.username} added to project {req.projectID}"}
