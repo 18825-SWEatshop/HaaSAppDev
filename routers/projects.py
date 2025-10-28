@@ -25,7 +25,7 @@ class ProjectCreate(BaseModel):
     description: str
     authorizedUsers: List[str] = []
 
-class ProjectLogin(BaseModel):
+class ProjectJoin(BaseModel):
     projectID : str
 
 @router.post("/create")
@@ -47,8 +47,8 @@ def api_create_project(p: ProjectCreate, user: str = Depends(current_user)):
     )
     return {"ok": True, "projectID": doc["projectID"]}
 
-@router.post("/login")
-def api_login_project(req: ProjectLogin, user: str = Depends(current_user)):
+@router.post("/join")
+def api_join_project(req: ProjectJoin, user: str = Depends(current_user)):
     if not get_project(req.projectID):
         raise HTTPException(404, "Project not found")
     if not user_can_access(user, req.projectID):
