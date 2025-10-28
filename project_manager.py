@@ -29,3 +29,24 @@ def user_can_access(username: str, projectId: str) -> bool:
     if not p:
         return False
     return username == p["owner"] or username in p.get("authorizedUsers", [])
+
+def add_user_to_project(projectId: str, username: str, requester: str) -> bool:
+    """Add a user to a project's authorized users list. Only project owner can do this."""
+    project = get_project(projectId)
+    if not project:
+        return False
+    
+    # Only the project owner can add users
+    if project["owner"] != requester:
+        return False
+    
+    # Don't add if user is already authorized or is the owner
+    if username == project["owner"] or username in project.get("authorizedUsers", []):
+        return False
+    
+    # Add user to authorized users list
+    _projects().update_one(
+        {"projectId": projectId},
+        {"$push": {"authorizedUsers": username}}
+    )
+    return True

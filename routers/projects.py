@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from typing import List
 import jwt, os
-from ..project_manager import create_project, user_can_access, get_project
+from ..project_manager import create_project, user_can_access, get_project, _projects, add_user_to_project
 
 SECRET = os.getenv("JWT_SECRET", "dev-secret")
 
@@ -28,6 +28,10 @@ class ProjectCreate(BaseModel):
 class ProjectJoin(BaseModel):
     projectID : str
 
+class AddUserToProject(BaseModel):
+    projectID: str
+    username: str
+
 @router.post("/create")
 def api_create_project(p: ProjectCreate, user: str = Depends(current_user)):
     if get_project(p.projectID):
@@ -39,13 +43,13 @@ def api_create_project(p: ProjectCreate, user: str = Depends(current_user)):
     final_authorized = sorted(auth_set)
 
     doc = create_project(
-        projectID=p.projectID,
+        projectId=p.projectID,
         name=p.name,
         description=p.description,
         authorized_users=final_authorized,
         owner=user,
     )
-    return {"ok": True, "projectID": doc["projectID"]}
+    return {"ok": True, "projectId": doc["projectId"]}
 
 @router.post("/join")
 def api_join_project(req: ProjectJoin, user: str = Depends(current_user)):
@@ -57,9 +61,33 @@ def api_join_project(req: ProjectJoin, user: str = Depends(current_user)):
     p = get_project(req.projectID)
     return {
         "ok": True,
-        "projectID": p["projectID"],
+        "projectId": p["projectId"],
         "name": p["name"],
         "owner": p["owner"],
         "authorizedUsers": p.get("authorizedUsers", []),
         "description": p.get("description", ""),
     }
+
+@router.get("/my-projects")
+def api_get_user_projects(user: str = Depends(current_user)):
+    return list(_projects().find({
+        "$or": [
+            {"owner": user},
+            {"authorizedUsers": user}
+        ]
+    }, {"_id": 0}))  # Exclude the _id field
+
+@router.post("/add-user")
+def api_add_user_to_project(req: AddUserToProject, requester: str = Depends(current_user)):
+    if not get_project(req.projectID):
+        raise HTTPException(404, "Project not found")
+    
+    if not add_user_to_project(req.projectID, req.username, requester):
+        # Check specific reasons for failure
+        project = get_project(req.projectID)
+        if project["owner"] != requester:
+            raise HTTPException(403, "Only project owner can add users")
+        if req.username in project.get("authorizedUsers", []) or req.username == project["owner"]:
+            raise HTTPException(400, "User is already authorized for this project")
+    
+    return {"ok": True, "message": f"User {req.username} added to project {req.projectID}"}
