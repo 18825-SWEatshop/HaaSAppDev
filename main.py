@@ -23,9 +23,9 @@ app.include_router(auth.router)
 app.include_router(projects.router, prefix="/projects")
 
 # Serve React static files
-dist_path = os.path.join(os.path.dirname(__file__), "dist")
-app.mount("/assets", StaticFiles(directory=os.path.join(dist_path, "assets")), name="assets")
+# dist_path = os.path.join(os.path.dirname(__file__), "dist")
+# app.mount("/assets", StaticFiles(directory=os.path.join(dist_path, "assets")), name="assets")
 
-@app.get("/{full_path:path}")
-async def serve_react(full_path: str):
-    return FileResponse(os.path.join(dist_path, "index.html"))
+# @app.get("/{full_path:path}")
+# async def serve_react(full_path: str):
+    # return FileResponse(os.path.join(dist_path, "index.html"))
