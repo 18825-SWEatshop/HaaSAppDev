@@ -1,9 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+import os
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 from .routers import auth, projects
 
-load_dotenv()
+# load_dotenv()
 
 app = FastAPI()
 
@@ -19,6 +22,10 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(projects.router, prefix="/projects")
 
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to the API!"}
+# Serve React static files
+# dist_path = os.path.join(os.path.dirname(__file__), "dist")
+# app.mount("/assets", StaticFiles(directory=os.path.join(dist_path, "assets")), name="assets")
+
+# @app.get("/{full_path:path}")
+# async def serve_react(full_path: str):
+    # return FileResponse(os.path.join(dist_path, "index.html"))
