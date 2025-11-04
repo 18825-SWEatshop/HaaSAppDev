@@ -18,29 +18,29 @@ def current_user(request: Request) -> str:
         return payload["u"]
     except Exception:
         raise HTTPException(401, "Invalid token")
-    
+
 class ProjectCreate(BaseModel):
-    projectID: str
+    projectId: str
     name: str
     description: str
     authorizedUsers: List[str] = []
 
 class ProjectJoin(BaseModel):
-    projectID : str
+    projectId : str
 
 class AddUserToProject(BaseModel):
-    projectID: str
+    projectId: str
     username: str
 
 class CheckUserAccess(BaseModel):
-    projectID: str
+    projectId: str
 
 class GetProjectDetails(BaseModel):
-    projectID: str
+    projectId: str
 
 @router.post("/create")
 def api_create_project(p: ProjectCreate, user: str = Depends(current_user)):
-    if get_project(p.projectID):
+    if get_project(p.projectId):
         raise HTTPException(400, "Project ID already exists")
     norm_users = [u.strip() for u in p.authorizedUsers if u.strip()]
     creator = user
@@ -49,7 +49,7 @@ def api_create_project(p: ProjectCreate, user: str = Depends(current_user)):
     final_authorized = sorted(auth_set)
 
     doc = create_project(
-        projectId=p.projectID,
+        projectId=p.projectId,
         name=p.name,
         description=p.description,
         authorized_users=final_authorized,
@@ -59,12 +59,12 @@ def api_create_project(p: ProjectCreate, user: str = Depends(current_user)):
 
 @router.post("/join")
 def api_join_project(req: ProjectJoin, user: str = Depends(current_user)):
-    if not get_project(req.projectID):
+    if not get_project(req.projectId):
         raise HTTPException(404, "Project not found")
-    if not user_can_access(user, req.projectID):
+    if not user_can_access(user, req.projectId):
         raise HTTPException(403, "You are not authorized for this project")
     # success — return minimal project info (expand later if you want)
-    p = get_project(req.projectID)
+    p = get_project(req.projectId)
     return {
         "ok": True,
         "projectId": p["projectId"],
@@ -85,15 +85,15 @@ def api_get_user_projects(user: str = Depends(current_user)):
 
 @router.post("/confirm-access")
 def api_confirm_user_access(req: CheckUserAccess, user: str = Depends(current_user)):
-    project = get_project(req.projectID)
+    project = get_project(req.projectId)
     if not project:
         raise HTTPException(404, "Project not found")
-    
-    has_access = user_can_access(user, req.projectID)
+
+    has_access = user_can_access(user, req.projectId)
 
     return {
         "ok": True,
-        "projectID": req.projectID,
+        "projectId": req.projectId,
         "hasAccess": has_access,
         "isOwner": project["owner"] == user,
         "isAuthorizedUser": user in project.get("authorizedUsers", [])
@@ -101,18 +101,18 @@ def api_confirm_user_access(req: CheckUserAccess, user: str = Depends(current_us
 
 @router.post("/details")
 def api_get_project_details(req: GetProjectDetails, user: str = Depends(current_user)):
-    project = get_project(req.projectID)
+    project = get_project(req.projectId)
     if not project:
         raise HTTPException(404, "Project not found")
-    
+
     # Check if user has access to view this project
-    if not user_can_access(user, req.projectID):
+    if not user_can_access(user, req.projectId):
         raise HTTPException(403, "You are not authorized to view this project")
-    
+
     # For now, hardware allocations and joinedUsers are not implemented yet
     return {
         "ok": True,
-        "projectID": project["projectId"],
+        "projectId": project["projectId"],
         "name": project["name"],
         "description": project.get("description", ""),
         "owner": project["owner"],
