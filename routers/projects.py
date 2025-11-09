@@ -3,10 +3,13 @@ from pydantic import BaseModel
 from typing import List
 import jwt, os
 from ..project_manager import create_project, user_can_access, get_project, _projects
+from ..user_manager import UserManager
 
 SECRET = os.getenv("JWT_SECRET", "dev-secret")
 
 router = APIRouter()
+
+PROJECT_NOT_FOUND_MSG = "Project not found"
 
 def current_user(request: Request) -> str:
     auth = request.headers.get("Authorization", "")
@@ -48,46 +51,51 @@ def api_create_project(p: ProjectCreate, user: str = Depends(current_user)):
     auth_set.add(creator)
     final_authorized = sorted(auth_set)
 
-    doc = create_project(
-        projectId=p.projectId,
-        name=p.name,
-        description=p.description,
-        authorized_users=final_authorized,
-        owner=user,
-    )
+    try:
+        doc = create_project(
+            projectId=p.projectId,
+            name=p.name,
+            description=p.description,
+            authorized_users=final_authorized,
+            owner=user,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    UserManager.add_project_to_user(user, doc["projectId"])
     return {"ok": True, "projectId": doc["projectId"]}
 
 @router.post("/join")
 def api_join_project(req: ProjectJoin, user: str = Depends(current_user)):
-    if not get_project(req.projectId):
-        raise HTTPException(404, "Project not found")
+    project = get_project(req.projectId)
+    if not project:
+        raise HTTPException(404, PROJECT_NOT_FOUND_MSG)
     if not user_can_access(user, req.projectId):
         raise HTTPException(403, "You are not authorized for this project")
-    # success — return minimal project info (expand later if you want)
-    p = get_project(req.projectId)
+
+    UserManager.add_project_to_user(user, project["projectId"])
     return {
         "ok": True,
-        "projectId": p["projectId"],
-        "name": p["name"],
-        "owner": p["owner"],
-        "authorizedUsers": p.get("authorizedUsers", []),
-        "description": p.get("description", ""),
+        "projectId": project["projectId"],
+        "name": project["name"],
+        "owner": project["owner"],
+        "authorizedUsers": project.get("authorizedUsers", []),
+        "description": project.get("description", ""),
     }
 
 @router.get("/my-projects")
 def api_get_user_projects(user: str = Depends(current_user)):
+    joined_ids = UserManager.get_joined_projects(user)
+    if not joined_ids:
+        return []
     return list(_projects().find({
-        "$or": [
-            {"owner": user},
-            {"authorizedUsers": user}
-        ]
-    }, {"_id": 0}))  # Exclude the _id field
+        "projectId": {"$in": joined_ids}
+    }, {"_id": 0}))
 
 @router.post("/confirm-access")
 def api_confirm_user_access(req: CheckUserAccess, user: str = Depends(current_user)):
     project = get_project(req.projectId)
     if not project:
-        raise HTTPException(404, "Project not found")
+        raise HTTPException(404, PROJECT_NOT_FOUND_MSG)
 
     has_access = user_can_access(user, req.projectId)
 
@@ -103,7 +111,7 @@ def api_confirm_user_access(req: CheckUserAccess, user: str = Depends(current_us
 def api_get_project_details(req: GetProjectDetails, user: str = Depends(current_user)):
     project = get_project(req.projectId)
     if not project:
-        raise HTTPException(404, "Project not found")
+        raise HTTPException(404, PROJECT_NOT_FOUND_MSG)
 
     # Check if user has access to view this project
     if not user_can_access(user, req.projectId):
@@ -118,6 +126,5 @@ def api_get_project_details(req: GetProjectDetails, user: str = Depends(current_
         "owner": project["owner"],
         "authorizedUsers": project.get("authorizedUsers", []),
         "createdAt": project.get("createdAt"),
-        "joinedUsers": project.get("joinedUsers", []),  # Placeholder for future implementation
         "hardwareAllocations": project.get("hardwareAllocations", [])  # Placeholder for future implementation
     }

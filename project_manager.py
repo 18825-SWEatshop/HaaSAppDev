@@ -1,5 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
+from pymongo.errors import DuplicateKeyError
 from .database import db
 
 def _projects():
@@ -16,9 +17,12 @@ def create_project(*, projectId: str, name: str, description: str, authorized_us
         "description": description.strip(),
         "authorizedUsers": [u.strip() for u in authorized_users if u.strip()],
         "owner": owner,
-        "createdAt": datetime.utcnow(),
+    "createdAt": datetime.now(timezone.utc),
     }
-    _projects().insert_one(doc)
+    try:
+        _projects().insert_one(doc)
+    except DuplicateKeyError as exc:
+        raise ValueError("Project ID already exists") from exc
     return doc
 
 def get_project(projectId: str) -> Optional[dict]:
