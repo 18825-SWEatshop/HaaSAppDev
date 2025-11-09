@@ -117,7 +117,6 @@ def api_get_project_details(req: GetProjectDetails, user: str = Depends(current_
     if not user_can_access(user, req.projectId):
         raise HTTPException(403, "You are not authorized to view this project")
 
-    # For now, hardware allocations and joinedUsers are not implemented yet
     return {
         "ok": True,
         "projectId": project["projectId"],

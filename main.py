@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 import os
 from fastapi.middleware.cors import CORSMiddleware
 # from dotenv import load_dotenv
-from .routers import auth, projects
+from .routers import auth, projects, resources
 
 # load_dotenv()
 
@@ -21,6 +21,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(projects.router, prefix="/projects")
+app.include_router(resources.router, prefix="/resources")
 
 # Serve React static files
 # dist_path = os.path.join(os.path.dirname(__file__), "dist")
