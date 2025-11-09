@@ -1,25 +1,20 @@
-import hashlib
 from typing import Optional, List
-
 from passlib.hash import pbkdf2_sha256
-from pymongo.errors import DuplicateKeyError
-
 from .database import db
 
 def _users_col():
     col = db["users"]
-    col.create_index("username_digest", unique=True)
+    col.create_index("username_hash", unique=False)
     return col
 
 class UserManager:
     @staticmethod
-    def _username_digest(username: str) -> str:
-        return hashlib.sha256(username.strip().lower().encode("utf-8")).hexdigest()
-
-    @staticmethod
     def _find_user_doc(username: str) -> Optional[dict]:
-        digest = UserManager._username_digest(username)
-        return _users_col().find_one({"username_digest": digest})
+        for doc in _users_col().find({}, {"username_hash": 1, "password_hash": 1, "joinedProjects": 1}):
+            username_hash = doc.get("username_hash")
+            if username_hash and pbkdf2_sha256.verify(username, username_hash):
+                return doc
+        return None
 
     @staticmethod
     def user_exists(username: str) -> bool:
@@ -29,16 +24,11 @@ class UserManager:
     def add_user(username: str, password: str):
         username_hash = pbkdf2_sha256.hash(username)
         password_hash = pbkdf2_sha256.hash(password)
-        username_digest = UserManager._username_digest(username)
-        try:
-            _users_col().insert_one({
-                "username_hash": username_hash,
-                "username_digest": username_digest,
-                "password_hash": password_hash,
-                "joinedProjects": [],
-            })
-        except DuplicateKeyError as exc:
-            raise ValueError("Username already exists") from exc
+        _users_col().insert_one({
+            "username_hash": username_hash,
+            "password_hash": password_hash,
+            "joinedProjects": [],
+        })
 
     @staticmethod
     def login(username: str, password: str) -> bool:

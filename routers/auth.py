@@ -16,10 +16,7 @@ class Creds(BaseModel):
 def register(c: Creds):
     if UserManager.user_exists(c.username):
         raise HTTPException(401, "User already exists")
-    try:
-        UserManager.add_user(c.username, c.password)
-    except ValueError as exc:
-        raise HTTPException(400, str(exc))
+    UserManager.add_user(c.username, c.password)
     token = jwt.encode({"u": c.username}, SECRET, algorithm="HS256")
     return {"token": token}
 
