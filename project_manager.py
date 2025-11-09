@@ -17,7 +17,7 @@ def create_project(*, projectId: str, name: str, description: str, authorized_us
         "description": description.strip(),
         "authorizedUsers": [u.strip() for u in authorized_users if u.strip()],
         "owner": owner,
-    "createdAt": datetime.now(timezone.utc),
+        "createdAt": datetime.now(timezone.utc),
     }
     try:
         _projects().insert_one(doc)

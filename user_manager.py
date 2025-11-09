@@ -1,45 +1,56 @@
 from typing import Optional, List
 from passlib.hash import pbkdf2_sha256
 from .database import db
-from pymongo.errors import DuplicateKeyError
 
 def _users_col():
     col = db["users"]
-    col.create_index("username", unique=True)
+    col.create_index("username_hash", unique=False)
     return col
 
 class UserManager:
     @staticmethod
+    def _find_user_doc(username: str) -> Optional[dict]:
+        for doc in _users_col().find({}, {"username_hash": 1, "password_hash": 1, "joinedProjects": 1}):
+            username_hash = doc.get("username_hash")
+            if username_hash and pbkdf2_sha256.verify(username, username_hash):
+                return doc
+        return None
+
+    @staticmethod
     def user_exists(username: str) -> bool:
-        return _users_col().find_one({"username": username}) is not None
+        return UserManager._find_user_doc(username) is not None
 
     @staticmethod
     def add_user(username: str, password: str):
-        hashed = pbkdf2_sha256.hash(password)
+        username_hash = pbkdf2_sha256.hash(username)
+        password_hash = pbkdf2_sha256.hash(password)
         _users_col().insert_one({
-            "username": username,
-            "password_hash": hashed,
+            "username_hash": username_hash,
+            "password_hash": password_hash,
             "joinedProjects": [],
         })
 
     @staticmethod
     def login(username: str, password: str) -> bool:
-        doc: Optional[dict] = _users_col().find_one({"username": username})
-        return bool(doc and pbkdf2_sha256.verify(password, doc["password_hash"]))
+        doc = UserManager._find_user_doc(username)
+        if not doc:
+            return False
+        password_hash = doc.get("password_hash")
+        return bool(password_hash and pbkdf2_sha256.verify(password, password_hash))
 
     @staticmethod
     def add_project_to_user(username: str, project_id: str) -> None:
+        doc = UserManager._find_user_doc(username)
+        if not doc:
+            raise ValueError("User not found")
         _users_col().update_one(
-            {"username": username},
+            {"_id": doc["_id"]},
             {"$addToSet": {"joinedProjects": project_id}}
         )
 
     @staticmethod
     def get_joined_projects(username: str) -> List[str]:
-        doc: Optional[dict] = _users_col().find_one(
-            {"username": username},
-            {"joinedProjects": 1, "_id": 0}
-        )
+        doc = UserManager._find_user_doc(username)
         if not doc:
             return []
         projects = doc.get("joinedProjects")
