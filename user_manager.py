@@ -1,20 +1,22 @@
-import hashlib
 from typing import Optional, List
-from passlib.hash import pbkdf2_sha256
 from pymongo.errors import DuplicateKeyError
 
 from .database import db
+from .cipher import encrypt
 
 def _users_col():
     col = db["users"]
-    col.create_index("username_digest", unique=True)
+    col.create_index("username_cipher", unique=True)
     return col
 
 class UserManager:
     @staticmethod
     def _find_user_doc(username: str) -> Optional[dict]:
-        username_hash = pbkdf2_sha256.hash(username)
-        return _users_col().find_one({"username_hash": username_hash})
+        try:
+            username_cipher = encrypt(username, 5, 1)
+        except ValueError:
+            return None
+        return _users_col().find_one({"username_cipher": username_cipher})
 
     @staticmethod
     def user_exists(username: str) -> bool:
@@ -22,12 +24,18 @@ class UserManager:
 
     @staticmethod
     def add_user(username: str, password: str):
-        username_hash = pbkdf2_sha256.hash(username)
-        password_hash = pbkdf2_sha256.hash(password)
+        try:
+            username_cipher = encrypt(username, 5, 1)
+        except ValueError as exc:
+            raise ValueError("Invalid characters in username") from exc
+        try:
+            password_cipher = encrypt(password, 5, 1)
+        except ValueError as exc:
+            raise ValueError("Invalid characters in password") from exc
         try:
             _users_col().insert_one({
-                "username_hash": username_hash,
-                "password_hash": password_hash,
+                "username_cipher": username_cipher,
+                "password_cipher": password_cipher,
                 "joinedProjects": [],
             })
         except DuplicateKeyError as exc:
@@ -38,8 +46,12 @@ class UserManager:
         doc = UserManager._find_user_doc(username)
         if not doc:
             return False
-        password_hash = doc.get("password_hash")
-        return bool(password_hash and pbkdf2_sha256.verify(password, password_hash))
+        password_cipher = doc.get("password_cipher")
+        try:
+            candidate_cipher = encrypt(password, 5, 1)
+        except ValueError:
+            return False
+        return bool(password_cipher and password_cipher == candidate_cipher)
 
     @staticmethod
     def add_project_to_user(username: str, project_id: str) -> None:
