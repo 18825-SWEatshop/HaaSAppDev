@@ -1,6 +1,5 @@
 import hashlib
 from typing import Optional, List
-
 from passlib.hash import pbkdf2_sha256
 from pymongo.errors import DuplicateKeyError
 
@@ -13,13 +12,9 @@ def _users_col():
 
 class UserManager:
     @staticmethod
-    def _username_digest(username: str) -> str:
-        return hashlib.sha256(username.strip().lower().encode("utf-8")).hexdigest()
-
-    @staticmethod
     def _find_user_doc(username: str) -> Optional[dict]:
-        digest = UserManager._username_digest(username)
-        return _users_col().find_one({"username_digest": digest})
+        username_hash = pbkdf2_sha256.hash(username)
+        return _users_col().find_one({"username_hash": username_hash})
 
     @staticmethod
     def user_exists(username: str) -> bool:
@@ -29,11 +24,9 @@ class UserManager:
     def add_user(username: str, password: str):
         username_hash = pbkdf2_sha256.hash(username)
         password_hash = pbkdf2_sha256.hash(password)
-        username_digest = UserManager._username_digest(username)
         try:
             _users_col().insert_one({
                 "username_hash": username_hash,
-                "username_digest": username_digest,
                 "password_hash": password_hash,
                 "joinedProjects": [],
             })
