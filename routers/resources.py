@@ -66,7 +66,10 @@ def api_checkin_resources(payload: ResourceAllocationChange, _: str = Depends(cu
 	except ValueError as exc:
 		status = 404 if str(exc) == RESOURCE_NOT_FOUND_MSG else 400
 		raise HTTPException(status, str(exc)) from exc
-	decrease_hardware_allocation(payload.projectId, payload.setNumber, payload.quantity)
+	try:
+		decrease_hardware_allocation(payload.projectId, payload.setNumber, payload.quantity)
+	except ValueError as exc:
+		raise HTTPException(404 if "not found" in str(exc).lower() else 400, str(exc)) from exc
 	return {"ok": True, "resource": _resource_to_response(resource)}
 
 
@@ -77,5 +80,8 @@ def api_checkout_resources(payload: ResourceAllocationChange, _: str = Depends(c
 	except ValueError as exc:
 		status = 404 if str(exc) == RESOURCE_NOT_FOUND_MSG else 400
 		raise HTTPException(status, str(exc)) from exc
-	increase_hardware_allocation(payload.projectId, payload.setNumber, payload.quantity)
+	try:
+		increase_hardware_allocation(payload.projectId, payload.setNumber, payload.quantity)
+	except ValueError as exc:
+		raise HTTPException(404 if "not found" in str(exc).lower() else 400, str(exc)) from exc
 	return {"ok": True, "resource": _resource_to_response(resource)}
