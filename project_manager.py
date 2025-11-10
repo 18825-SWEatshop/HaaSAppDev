@@ -1,7 +1,12 @@
 from datetime import datetime, timezone
 from typing import Optional, List
+from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
+
 from .database import db
+
+PROJECT_NOT_FOUND_MSG = "Project not found"
+INVALID_SET_MSG = "Invalid set number"
 
 def _projects():
     if db is None:
@@ -38,15 +43,15 @@ def user_can_access(username: str, projectId: str) -> bool:
 def get_hardware_allocation(projectId: str, set_number: int) -> int:
     project = get_project(projectId)
     if not project:
-        raise ValueError("Project not found")
+        raise ValueError(PROJECT_NOT_FOUND_MSG)
     allocations = project.get("hardwareAllocations", [])
     if set_number < 1 or set_number > len(allocations):
-        raise ValueError("Invalid set number")
+        raise ValueError(INVALID_SET_MSG)
     return allocations[set_number - 1]
 
 def increase_hardware_allocation(projectId: str, set_number: int, quantity: int) -> dict:
     if set_number < 1:
-        raise ValueError("Invalid set number")
+        raise ValueError(INVALID_SET_MSG)
     index = set_number - 1
     update_result = _projects().find_one_and_update(
         {"projectId": projectId},
@@ -54,16 +59,16 @@ def increase_hardware_allocation(projectId: str, set_number: int, quantity: int)
         return_document=ReturnDocument.AFTER,
     )
     if not update_result:
-        raise ValueError("Project not found")
+        raise ValueError(PROJECT_NOT_FOUND_MSG)
     return update_result
 
 def decrease_hardware_allocation(projectId: str, set_number: int, quantity: int) -> dict:
     if set_number < 1:
-        raise ValueError("Invalid set number")
+        raise ValueError(INVALID_SET_MSG)
     index = set_number - 1
     project = get_project(projectId)
     if not project:
-        raise ValueError("Project not found")
+        raise ValueError(PROJECT_NOT_FOUND_MSG)
     current_allocation = project.get("hardwareAllocations", [0, 0])[index]
     if current_allocation < quantity:
         raise ValueError("Insufficient hardware allocation to decrease")
