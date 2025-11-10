@@ -77,9 +77,10 @@ def api_join_project(req: ProjectJoin, user: str = Depends(current_user)):
         "ok": True,
         "projectId": project["projectId"],
         "name": project["name"],
+        "description": project.get("description", ""),
         "owner": project["owner"],
         "authorizedUsers": project.get("authorizedUsers", []),
-        "description": project.get("description", ""),
+        "hardwareAllocations": project.get("hardwareAllocations", []),
     }
 
 @router.get("/my-projects")
@@ -124,6 +125,5 @@ def api_get_project_details(req: GetProjectDetails, user: str = Depends(current_
         "description": project.get("description", ""),
         "owner": project["owner"],
         "authorizedUsers": project.get("authorizedUsers", []),
-        "createdAt": project.get("createdAt"),
         "hardwareAllocations": project.get("hardwareAllocations", [])  # Placeholder for future implementation
     }

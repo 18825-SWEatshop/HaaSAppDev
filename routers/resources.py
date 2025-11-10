@@ -3,6 +3,7 @@ import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, PositiveInt
 
+from ..project_manager import get_hardware_allocation, increase_hardware_allocation, decrease_hardware_allocation
 from ..resource_manager import (
 	RESOURCE_NOT_FOUND_MSG,
 	checkin_resource,
@@ -28,9 +29,10 @@ def current_user(request: Request) -> str:
 		raise HTTPException(401, "Invalid token") from exc
 
 
-class ResourceQuantityPayload(BaseModel):
+class ResourceAllocationChange(BaseModel):
 	setNumber: int
 	quantity: PositiveInt
+	projectId: str
 
 
 def _resource_to_response(resource_doc: dict) -> dict:
@@ -58,20 +60,22 @@ def api_get_availability(set_number: int, _: str = Depends(current_user)):
 
 
 @router.post("/checkin")
-def api_checkin_resources(payload: ResourceQuantityPayload, _: str = Depends(current_user)):
+def api_checkin_resources(payload: ResourceAllocationChange, _: str = Depends(current_user)):
 	try:
 		resource = checkin_resource(payload.setNumber, payload.quantity)
 	except ValueError as exc:
 		status = 404 if str(exc) == RESOURCE_NOT_FOUND_MSG else 400
 		raise HTTPException(status, str(exc)) from exc
+	decrease_hardware_allocation(payload.projectId, payload.setNumber, payload.quantity)
 	return {"ok": True, "resource": _resource_to_response(resource)}
 
 
 @router.post("/checkout")
-def api_checkout_resources(payload: ResourceQuantityPayload, _: str = Depends(current_user)):
+def api_checkout_resources(payload: ResourceAllocationChange, _: str = Depends(current_user)):
 	try:
 		resource = checkout_resource(payload.setNumber, payload.quantity)
 	except ValueError as exc:
 		status = 404 if str(exc) == RESOURCE_NOT_FOUND_MSG else 400
 		raise HTTPException(status, str(exc)) from exc
+	increase_hardware_allocation(payload.projectId, payload.setNumber, payload.quantity)
 	return {"ok": True, "resource": _resource_to_response(resource)}

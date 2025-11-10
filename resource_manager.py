@@ -2,7 +2,6 @@ from typing import Optional, Dict
 from pymongo import ReturnDocument
 from .database import db
 
-
 RESOURCE_NOT_FOUND_MSG = "Resource set not found"
 
 
