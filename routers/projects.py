@@ -1,8 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
-from typing import List
 import jwt, os
-from ..project_manager import create_project, user_can_access, get_project, _projects
+from ..project_manager import create_project, user_can_access, get_project, _projects, add_member
 from ..user_manager import UserManager
 
 SECRET = os.getenv("JWT_SECRET", "dev-secret")
@@ -26,14 +25,9 @@ class ProjectCreate(BaseModel):
     projectId: str
     name: str
     description: str
-    authorizedUsers: List[str] = []
 
 class ProjectJoin(BaseModel):
-    projectId : str
-
-class AddUserToProject(BaseModel):
     projectId: str
-    username: str
 
 class CheckUserAccess(BaseModel):
     projectId: str
@@ -45,19 +39,12 @@ class GetProjectDetails(BaseModel):
 def api_create_project(p: ProjectCreate, user: str = Depends(current_user)):
     if get_project(p.projectId):
         raise HTTPException(400, "Project ID already exists")
-    norm_users = [u.strip() for u in p.authorizedUsers if u.strip()]
-    creator = user
-    auth_set = set(norm_users)
-    auth_set.add(creator)
-    final_authorized = sorted(auth_set)
-
     try:
         doc = create_project(
             projectId=p.projectId,
             name=p.name,
             description=p.description,
-            authorized_users=final_authorized,
-            owner=user,
+            creator=user,
         )
     except ValueError as exc:
         raise HTTPException(400, str(exc))
@@ -69,18 +56,15 @@ def api_join_project(req: ProjectJoin, user: str = Depends(current_user)):
     project = get_project(req.projectId)
     if not project:
         raise HTTPException(404, PROJECT_NOT_FOUND_MSG)
-    if not user_can_access(user, req.projectId):
-        raise HTTPException(403, "You are not authorized for this project")
-
-    UserManager.add_project_to_user(user, project["projectId"])
+    updated_project = add_member(req.projectId, user)
+    UserManager.add_project_to_user(user, updated_project["projectId"])
     return {
         "ok": True,
-        "projectId": project["projectId"],
-        "name": project["name"],
-        "description": project.get("description", ""),
-        "owner": project["owner"],
-        "authorizedUsers": project.get("authorizedUsers", []),
-        "hardwareAllocations": project.get("hardwareAllocations", []),
+        "projectId": updated_project["projectId"],
+        "name": updated_project["name"],
+        "description": updated_project.get("description", ""),
+        "members": updated_project.get("members", []),
+        "hardwareAllocations": updated_project.get("hardwareAllocations", []),
     }
 
 @router.get("/my-projects")
@@ -104,8 +88,7 @@ def api_confirm_user_access(req: CheckUserAccess, user: str = Depends(current_us
         "ok": True,
         "projectId": req.projectId,
         "hasAccess": has_access,
-        "isOwner": project["owner"] == user,
-        "isAuthorizedUser": user in project.get("authorizedUsers", [])
+        "isMember": user in project.get("members", []),
     }
 
 @router.post("/details")
@@ -123,7 +106,6 @@ def api_get_project_details(req: GetProjectDetails, user: str = Depends(current_
         "projectId": project["projectId"],
         "name": project["name"],
         "description": project.get("description", ""),
-        "owner": project["owner"],
-        "authorizedUsers": project.get("authorizedUsers", []),
+        "members": project.get("members", []),
         "hardwareAllocations": project.get("hardwareAllocations", [])  # Placeholder for future implementation
     }

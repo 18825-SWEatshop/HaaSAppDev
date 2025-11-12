@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Optional
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
@@ -15,13 +15,12 @@ def _projects():
     col.create_index("projectId", unique=True)
     return col
 
-def create_project(*, projectId: str, name: str, description: str, authorized_users: List[str], owner: str):
+def create_project(*, projectId: str, name: str, description: str, creator: str):
     doc = {
         "projectId": projectId.strip(),
         "name": name.strip(),
         "description": description.strip(),
-        "authorizedUsers": [u.strip() for u in authorized_users if u.strip()],
-        "owner": owner,
+        "members": [creator.strip()],
         "hardwareAllocations": [0, 0],
         "createdAt": datetime.now(timezone.utc),
     }
@@ -38,7 +37,20 @@ def user_can_access(username: str, projectId: str) -> bool:
     p = get_project(projectId)
     if not p:
         return False
-    return username == p["owner"] or username in p.get("authorizedUsers", [])
+    return username in p.get("members", [])
+
+def add_member(projectId: str, username: str) -> dict:
+    clean_username = username.strip()
+    if not clean_username:
+        raise ValueError("Username required")
+    update_result = _projects().find_one_and_update(
+        {"projectId": projectId},
+        {"$addToSet": {"members": clean_username}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not update_result:
+        raise ValueError(PROJECT_NOT_FOUND_MSG)
+    return update_result
 
 def get_hardware_allocation(projectId: str, set_number: int) -> int:
     project = get_project(projectId)
